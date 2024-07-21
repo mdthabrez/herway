@@ -1,30 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SafeAreaView, TextInput, FlatList, Text, TouchableOpacity, StyleSheet, View, Image } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
+import { Ionicons } from '@expo/vector-icons';
 
-// Dummy locations for search suggestions
 const dummyLocations = [
-  '123 Main St, Springfield',
-  '456 Elm St, Metropolis',
-  '789 Oak St, Gotham',
-  '101 Maple St, Star City',
-  '202 Pine St, Central City',
+  '123 Anna Salai, Chennai',
+  '456 Mount Road, Chennai',
+  '789 T Nagar, Chennai',
+  '101 Nungambakkam, Chennai',
+  '202 Adyar, Chennai',
 ];
 
-// Dummy taxis data
-const dummyTaxis = [
-  { id: '1', latitude: 37.78825, longitude: -122.4324 },
-  { id: '2', latitude: 37.78850, longitude: -122.4340 },
-  { id: '3', latitude: 37.78700, longitude: -122.4300 },
-  { id: '4', latitude: 37.78900, longitude: -122.4330 },
-  { id: '5', latitude: 37.78600, longitude: -122.4310 },
-];
+const taxiTypes = {
+  auto: { icon: require('../assets/UberAuto.png'), name: 'Auto', basePrice: 30, mapIcon: require('../assets/UberAuto.png') },
+  femaleDriver: { icon: require('../assets/UberAuto.png'), name: 'Female Driver', basePrice: 60, mapIcon: require('../assets/UberAuto.png') }, // New type
+  car: { icon: require('../assets/UbercarX.jpeg'), name: 'Car', basePrice: 50, mapIcon: require('../assets/top-UberX.png') },
+  suv: { icon: require('../assets/top-UberXL.png'), name: 'SUV', basePrice: 80, mapIcon: require('../assets/top-UberXL.png') },
+ 
+};
 
 const initialRegion = {
-  latitude: 37.78825,
-  longitude: -122.4324,
+  latitude: 13.0827,
+  longitude: 80.2707,
   latitudeDelta: 0.0922,
   longitudeDelta: 0.0421,
+};
+
+const generateRandomCoordinates = (latitude, longitude, count, offset = 0.002) => {
+  return Array.from({ length: count }, () => ({
+    latitude: latitude + (Math.random() - 0.5) * offset,
+    longitude: longitude + (Math.random() - 0.5) * offset,
+  }));
+};
+
+const generateTaxiMarkers = () => {
+  const autoMarkers = generateRandomCoordinates(initialRegion.latitude, initialRegion.longitude, 3);
+  const carMarkers = generateRandomCoordinates(initialRegion.latitude + 0.003, initialRegion.longitude, 3);
+  const suvMarkers = generateRandomCoordinates(initialRegion.latitude + 0.006, initialRegion.longitude, 3);
+  const femaleDriverMarkers = generateRandomCoordinates(initialRegion.latitude + 0.009, initialRegion.longitude, 3); // New type
+
+  return [
+    ...autoMarkers.map(coord => ({ type: 'auto', coordinate: coord })),
+    ...carMarkers.map(coord => ({ type: 'car', coordinate: coord })),
+    ...suvMarkers.map(coord => ({ type: 'suv', coordinate: coord })),
+    ...femaleDriverMarkers.map(coord => ({ type: 'femaleDriver', coordinate: coord })), // New type
+  ];
 };
 
 const TestScreen = () => {
@@ -33,7 +53,34 @@ const TestScreen = () => {
   const [suggestions, setSuggestions] = useState([]);
   const [fromMarker, setFromMarker] = useState(null);
   const [toMarker, setToMarker] = useState(null);
-  const [activeField, setActiveField] = useState(null); // State to track the active input field
+  const [activeField, setActiveField] = useState(null);
+  const [selectedTaxiType, setSelectedTaxiType] = useState('auto');
+  const [taxiMarkers, setTaxiMarkers] = useState(generateTaxiMarkers());
+  const [filteredTaxiMarkers, setFilteredTaxiMarkers] = useState([]);
+  const [prices, setPrices] = useState({});
+
+  useEffect(() => {
+    generateRandomPrices();
+  }, []);
+
+  useEffect(() => {
+    filterTaxiMarkers();
+  }, [taxiMarkers, selectedTaxiType]);
+
+  const generateRandomPrices = () => {
+    const newPrices = {};
+    Object.keys(taxiTypes).forEach(type => {
+      const basePrice = taxiTypes[type].basePrice;
+      const randomFactor = 1 + (Math.random() * 0.4 - 0.2); // +/- 20%
+      newPrices[type] = Math.round(basePrice * randomFactor);
+    });
+    setPrices(newPrices);
+  };
+
+  const filterTaxiMarkers = () => {
+    const filteredMarkers = taxiMarkers.filter(marker => marker.type === selectedTaxiType);
+    setFilteredTaxiMarkers(filteredMarkers);
+  };
 
   const handleInputChange = (text, type) => {
     if (type === 'from') {
@@ -50,7 +97,7 @@ const TestScreen = () => {
     } else {
       setSuggestions([]);
     }
-    setActiveField(type); // Set the active input field
+    setActiveField(type);
   };
 
   const handleSuggestionPress = (suggestion, type) => {
@@ -70,7 +117,11 @@ const TestScreen = () => {
       });
     }
     setSuggestions([]);
-    setActiveField(null); // Reset the active input field
+    setActiveField(null);
+  };
+
+  const handleTaxiTypeChange = (type) => {
+    setSelectedTaxiType(type);
   };
 
   return (
@@ -92,61 +143,89 @@ const TestScreen = () => {
             strokeWidth={3}
           />
         )}
-        {dummyTaxis.map(taxi => (
+        {filteredTaxiMarkers.map((marker, index) => (
           <Marker
-            key={taxi.id}
-            coordinate={{ latitude: taxi.latitude, longitude: taxi.longitude }}
-            title={`Taxi ${taxi.id}`}
+            key={index}
+            coordinate={marker.coordinate}
+            title={`Taxi ${taxiTypes[marker.type].name}`}
           >
             <Image
-              source={require('../assets/top-UberX.png')} // Ensure you have a taxi icon image in the assets folder
+              source={taxiTypes[marker.type].mapIcon}
               style={styles.taxiIcon}
-              resizeMode="contain"
             />
           </Marker>
         ))}
       </MapView>
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.input}
-          value={fromQuery}
-          onChangeText={(text) => handleInputChange(text, 'from')}
-          onFocus={() => setActiveField('from')}
-          placeholder="Where from?"
-        />
-        {activeField === 'from' && (
+      <View style={styles.topBar}>
+        <TouchableOpacity>
+          <Ionicons name="arrow-back" size={24} color="black" />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.contentContainer}>
+        <View style={styles.locationContainer}>
+          <View style={styles.locationInput}>
+            <Ionicons name="person-outline" size={24} color="green" />
+            <TextInput
+              style={styles.input}
+              value={fromQuery}
+              onChangeText={(text) => handleInputChange(text, 'from')}
+              placeholder="Where from?"
+            />
+          </View>
+          <View style={styles.locationInput}>
+            <Ionicons name="location-outline" size={24} color="red" />
+            <TextInput
+              style={styles.input}
+              value={toQuery}
+              onChangeText={(text) => handleInputChange(text, 'to')}
+              placeholder="To?"
+            />
+          </View>
+          <TouchableOpacity style={styles.nowButton}>
+            <Text style={styles.nowButtonText}>Now</Text>
+          </TouchableOpacity>
+        </View>
+        {activeField && (
           <FlatList
             data={suggestions}
             keyExtractor={(item, index) => index.toString()}
             renderItem={({ item }) => (
-              <TouchableOpacity onPress={() => handleSuggestionPress(item, 'from')}>
+              <TouchableOpacity onPress={() => handleSuggestionPress(item, activeField)}>
                 <View style={styles.suggestionItem}>
-                  <Text>{item}</Text>
+                  <Text style={styles.suggestionText}>{item}</Text>
                 </View>
               </TouchableOpacity>
             )}
+            style={styles.suggestionList}
           />
         )}
-        <TextInput
-          style={styles.input}
-          value={toQuery}
-          onChangeText={(text) => handleInputChange(text, 'to')}
-          onFocus={() => setActiveField('to')}
-          placeholder="To?"
+        <FlatList
+          data={Object.keys(taxiTypes)}
+          keyExtractor={(item) => item}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.taxiTypeButton,
+                selectedTaxiType === item && styles.selectedTaxiTypeButton
+              ]}
+              onPress={() => handleTaxiTypeChange(item)}
+            >
+              <Image
+                source={taxiTypes[item].icon}
+                style={styles.taxiTypeIcon}
+              />
+              <View style={styles.taxiTypeInfo}>
+                <Text style={styles.taxiTypeName}>{taxiTypes[item].name}</Text>
+                <Text style={styles.taxiTypePrice}>₹{prices[item] || '--'}</Text>
+              </View>
+              <Text style={styles.estimatedTime}>2 min</Text>
+            </TouchableOpacity>
+          )}
+          style={styles.taxiTypeList}
         />
-        {activeField === 'to' && (
-          <FlatList
-            data={suggestions}
-            keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity onPress={() => handleSuggestionPress(item, 'to')}>
-                <View style={styles.suggestionItem}>
-                  <Text>{item}</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-          />
-        )}
+        <TouchableOpacity style={styles.bookButton}>
+          <Text style={styles.bookButtonText}>Book {taxiTypes[selectedTaxiType].name}</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -155,36 +234,110 @@ const TestScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'flex-end',
   },
   map: {
     flex: 1,
   },
-  searchContainer: {
+  topBar: {
+    position: 'absolute',
+    top: 40,
+    left: 20,
+  },
+  contentContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 10,
-    elevation: 10,
+    padding: 20,
+  },
+  locationContainer: {
+    marginBottom: 20,
+  },
+  locationInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   input: {
-    height: 50,
-    borderColor: 'gray',
-    borderWidth: 1,
-    borderRadius: 20, // Rounded corners for input fields
-    marginBottom: 10,
-    paddingHorizontal: 15,
-    backgroundColor: '#f8f8f8',
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 16,
+  },
+  nowButton: {
+    position: 'absolute',
+    right: 0,
+    top: 10,
+    backgroundColor: '#f0f0f0',
+    padding: 5,
+    borderRadius: 15,
+  },
+  nowButtonText: {
+    fontSize: 14,
+  },
+  suggestionList: {
+    maxHeight: 200,
   },
   suggestionItem: {
-    padding: 10,
-    borderRadius: 20, // Rounded corners for suggestion items
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  suggestionText: {
+    fontSize: 16,
+  },
+  taxiTypeList: {
+    maxHeight: 250,
+  },
+  taxiTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  selectedTaxiTypeButton: {
     backgroundColor: '#f0f0f0',
-    marginBottom: 5,
+  },
+  taxiTypeIcon: {
+    width: 50,
+    height: 50,
+    resizeMode: 'contain',
+  },
+  taxiTypeInfo: {
+    flex: 1,
+    marginLeft: 15,
+  },
+  taxiTypeName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  taxiTypePrice: {
+    fontSize: 14,
+    color: '#666',
+  },
+  estimatedTime: {
+    fontSize: 14,
+    color: '#666',
+  },
+  bookButton: {
+    backgroundColor: 'black',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  bookButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   taxiIcon: {
-    width: 30, // Adjust the size of the icon here
-    height: 30, // Adjust the size of the icon here
+    width: 30,
+    height: 30,
+    resizeMode: 'contain',
   },
 });
 

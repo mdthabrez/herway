@@ -1,31 +1,43 @@
-// components/SOSButton.js
-import React, { useRef } from 'react';
-import { StyleSheet, TouchableOpacity, Text, Animated, PanResponder, View } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, PanResponder, Animated, Alert, TouchableOpacity } from 'react-native';
 
-const SOSButton = () => {
-  const pan = useRef(new Animated.ValueXY()).current;
+const FloatingSosButton = () => {
+  const [pan] = useState(new Animated.ValueXY());
 
-  // Create PanResponder to handle drag gestures
   const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], {
-      useNativeDriver: false,
-    }),
-    onPanResponderRelease: (e, gestureState) => {
-      // Update position based on gesture
-      Animated.spring(pan, {
-        toValue: { x: pan.x._value + gestureState.dx, y: pan.y._value + gestureState.dy },
-        useNativeDriver: false,
-      }).start();
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderMove: Animated.event([
+      null,
+      { dx: pan.x, dy: pan.y }
+    ], { useNativeDriver: false }),
+    onPanResponderRelease: () => {
+      pan.flattenOffset();
     },
+    onPanResponderGrant: () => {
+      pan.setOffset({
+        x: pan.x._value,
+        y: pan.y._value
+      });
+    }
   });
+
+  const handleSosPress = () => {
+    Alert.alert(
+      "SOS Alert",
+      "Are you sure you want to send an SOS alert?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "OK", onPress: () => console.log("SOS Alert sent!") }
+      ]
+    );
+  };
 
   return (
     <Animated.View
-      style={[styles.container, { transform: pan.getTranslateTransform() }]}
+      style={[styles.button, { transform: [{ translateX: pan.x }, { translateY: pan.y }] }]}
       {...panResponder.panHandlers}
     >
-      <TouchableOpacity style={styles.button}>
+      <TouchableOpacity onPress={handleSosPress}>
         <Text style={styles.text}>SOS</Text>
       </TouchableOpacity>
     </Animated.View>
@@ -33,13 +45,10 @@ const SOSButton = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    bottom: 30,
-    right: 30,
-    zIndex: 1000,
-  },
   button: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -47,6 +56,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   text: {
     color: 'white',
@@ -54,4 +67,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SOSButton;
+export default FloatingSosButton;
